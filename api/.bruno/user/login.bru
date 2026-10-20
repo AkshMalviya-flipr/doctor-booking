@@ -11,11 +11,8 @@ post {
 }
 
 body:graphql {
-  mutation Login($input: LoginInput!) {
-    login(input: $input) {
-      success
-      message
-    }
+  mutation Login($input: LoginDto!) {
+    login(input: $input)
   }
 }
 

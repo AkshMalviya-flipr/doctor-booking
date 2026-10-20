@@ -8,10 +8,25 @@ import { GraphqlModule } from './core/graphql/graphql.module';
 import { DatabaseModule } from './core/database/database.module';
 import { PaginationModule } from './common/pagination/pagination.module';
 import { AuthModule } from './features/auth/auth.module';
+import { DoctorModule } from './features/doctor/doctor.module';
+import { AvailabilitySlotModule } from './features/availability-slot/availability-slot.module';
+import { ConsultationModule } from './features/consultation/consultation.module';
+import { PrescriptionModule } from './features/prescription/prescription.module';
+import { PaymentModule } from './features/payment/payment.module';
 import { AuthMiddleware } from './core/middleware/auth.middleware';
 
 @Module({
-  imports: [GraphqlModule, DatabaseModule, PaginationModule, AuthModule],
+  imports: [
+    GraphqlModule,
+    DatabaseModule,
+    PaginationModule,
+    AuthModule,
+    DoctorModule,
+    AvailabilitySlotModule,
+    ConsultationModule,
+    PrescriptionModule,
+    PaymentModule,
+  ],
   providers: [{ provide: APP_GUARD, useClass: PublicApiGuard }],
 })
 export class AppModule implements NestModule {

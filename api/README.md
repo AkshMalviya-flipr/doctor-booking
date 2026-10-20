@@ -1,124 +1,402 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Amrutam - Telemedicine & Doctor Booking GraphQL API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A robust, enterprise-grade Telemedicine and Doctor Consultation Backend built with **NestJS**, **GraphQL (Apollo Server Code-First)**, **TypeORM**, and **PostgreSQL**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📑 Table of Contents
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Overview](#overview)
+- [Architecture & Tech Stack](#architecture--tech-stack)
+- [End-to-End API Flow](#end-to-end-api-flow)
+  - [1. Authentication & Onboarding](#1-authentication--onboarding)
+  - [2. Doctor Availability Slots](#2-doctor-availability-slots)
+  - [3. Consultation Booking](#3-consultation-booking)
+  - [4. Payment Processing](#4-payment-processing)
+  - [5. Consultation Completion & Prescription](#5-consultation-completion--prescription)
+- [GraphQL Operations Reference](#graphql-operations-reference)
+  - [Auth Operations](#auth-operations)
+  - [Doctor Operations](#doctor-operations)
+  - [Availability Slot Operations](#availability-slot-operations)
+  - [Consultation Operations](#consultation-operations)
+  - [Prescription Operations](#prescription-operations)
+  - [Payment Operations](#payment-operations)
+- [Authentication & Security](#authentication--security)
+- [Environment Configuration](#environment-configuration)
+- [Getting Started](#getting-started)
+- [Testing & Tooling](#testing--tooling)
 
-## Project setup
+---
 
-```bash
-$ bun install
+## Overview
+
+Amrutam API is designed for a complete telemedicine workflow connecting patients with verified medical specialists. Key capabilities include:
+- **Role-based access** for Patients, Doctors, and Administrators.
+- **Availability slot management** with single and bulk slot generation and overlap collision prevention.
+- **Slot reservation & consultation booking** with status progression (`PENDING`, `CONFIRMED`, `COMPLETED`, `CANCELLED`, `RESCHEDULED`).
+- **Payment processing & refunds** tied directly to consultations.
+- **Digital prescriptions** with structured medication dosage, frequency, and instructions.
+- **Clean GraphQL contract**: Action mutations return lightweight status strings (`String`) to optimize performance, while queries return rich entity graphs resolved on-demand.
+
+---
+
+## Architecture & Tech Stack
+
+- **Framework**: [NestJS](https://nestjs.com/) (v12)
+- **API Paradigm**: Code-First GraphQL via [@nestjs/graphql](https://docs.nestjs.com/graphql/quick-start) & [@nestjs/apollo](https://docs.nestjs.com/graphql/quick-start)
+- **Database ORM**: [TypeORM](https://typeorm.io/) with PostgreSQL
+- **Authentication**: JWT (JSON Web Tokens) with dual-mode support:
+  - `Authorization: Bearer <token>` header
+  - `jwt_access_token` HTTP-only, secure cookies
+- **Validation & Transformation**: `class-validator` & `class-transformer`
+- **Security**: `helmet`, `cors`, `bcrypt` password hashing, global `PublicApiGuard`
+
+---
+
+## End-to-End API Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Patient
+    actor Doctor
+    participant API as GraphQL API
+    participant DB as PostgreSQL
+
+    Note over Doctor,API: Phase 1: Onboarding & Availability
+    Doctor->>API: mutation signup(email, password, role: DOCTOR)
+    API-->>Doctor: "Account created successfully" (JWT Cookie / Token)
+    Doctor->>API: mutation createDoctorProfile(specialization, fee, license...)
+    API-->>Doctor: "Doctor profile created successfully"
+    Doctor->>API: mutation createBulkAvailabilitySlots(startTime, endTime, intervalMinutes: 30)
+    API-->>Doctor: "Successfully created N slots"
+
+    Note over Patient,API: Phase 2: Discovery & Booking
+    Patient->>API: mutation signup(email, password, role: PATIENT)
+    API-->>Patient: "Account created successfully"
+    Patient->>API: query listDoctors / getDoctorById
+    API-->>Patient: [Doctor details, specialization, fees]
+    Patient->>API: query getDoctorAvailability(doctorId, fromDate)
+    API-->>Patient: [Available Slots]
+    Patient->>API: mutation bookConsultation(doctorId, slotId, consultationType, reason)
+    API->>DB: Lock slot (AVAILABLE -> BOOKED) & Create Consultation (PENDING)
+    API-->>Patient: "Consultation booked successfully"
+
+    Note over Patient,API: Phase 3: Payment
+    Patient->>API: mutation createPayment(consultationId, amount, paymentMethod)
+    API-->>Patient: "Payment initialized successfully"
+    Patient->>API: mutation processPayment(paymentId, transactionId)
+    API->>DB: Update Payment (COMPLETED) & Consultation (CONFIRMED)
+    API-->>Patient: "Payment processed successfully"
+
+    Note over Doctor,Patient: Phase 4: Consultation & Prescription
+    Doctor->>API: mutation completeConsultation(consultationId, notes)
+    API-->>Doctor: "Consultation marked as completed successfully"
+    Doctor->>API: mutation createPrescription(consultationId, diagnosis, medications)
+    API-->>Doctor: "Prescription created successfully"
+    Patient->>API: query myPrescriptions
+    API-->>Patient: [Prescriptions with dosages & instructions]
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ bun run start
+## GraphQL Operations Reference
 
-# watch mode
-$ bun run start:dev
+All GraphQL operations are accessible at `/graphql`.
 
-# production mode
-$ bun run start:prod
+### Auth Operations
+
+| Type | Operation | Access | Description |
+|---|---|---|---|
+| `Mutation` | `signup(input: SignupDto!): String!` | Public | Creates a new user and profile; sets JWT cookie; returns success message. |
+| `Mutation` | `login(input: LoginDto!): String!` | Public | Validates credentials; sets JWT cookie; returns success message. |
+| `Mutation` | `logout: String!` | Protected | Clears JWT authentication cookies. |
+| `Query` | `me: UserEntity!` | Protected | Returns the authenticated user's profile and account status. |
+
+```graphql
+# Example: User Signup
+mutation Signup($input: SignupDto!) {
+  signup(input: $input)
+}
+
+# Example: Login
+mutation Login($input: LoginDto!) {
+  login(input: $input)
+}
+
+# Example: Get Authenticated Profile
+query Me {
+  me {
+    user_id
+    email
+    role
+    status
+    profile {
+      full_name
+      phone
+      gender
+      date_of_birth
+    }
+  }
+}
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ bun run test
+### Doctor Operations
 
-# e2e tests
-$ bun run test:e2e
+| Type | Operation | Access | Description |
+|---|---|---|---|
+| `Mutation` | `createDoctorProfile(input: CreateDoctorDto!): String!` | DOCTOR | Creates medical profile (license, specialization, consultation fee). |
+| `Mutation` | `updateDoctorProfile(input: UpdateDoctorDto!): String!` | DOCTOR | Updates doctor profile information. |
+| `Query` | `myDoctorProfile: DoctorEntity!` | DOCTOR | Retrieves the logged-in doctor's profile. |
+| `Query` | `getDoctorById(doctorId: ID!): DoctorEntity!` | Public | Retrieves specific doctor details by doctor ID. |
+| `Query` | `listDoctors: [DoctorEntity!]!` | Public | Retrieves all registered doctors. |
 
-# test coverage
-$ bun run test:cov
+```graphql
+# Example: Create Doctor Profile
+mutation CreateDoctorProfile($input: CreateDoctorDto!) {
+  createDoctorProfile(input: $input)
+}
+
+# Example: List Doctors
+query ListDoctors {
+  listDoctors {
+    doctor_id
+    specialization
+    experience_years
+    consultation_fee
+    verification_status
+    bio
+    user {
+      profile {
+        full_name
+        profile_image_url
+      }
+    }
+  }
+}
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Availability Slot Operations
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Type | Operation | Access | Description |
+|---|---|---|---|
+| `Mutation` | `createAvailabilitySlot(input: CreateAvailabilitySlotDto!): String!` | DOCTOR | Creates a single availability slot. |
+| `Mutation` | `createBulkAvailabilitySlots(input: BulkCreateSlotsDto!): String!` | DOCTOR | Generates multiple consecutive slots by interval minutes. |
+| `Mutation` | `updateAvailabilitySlot(slotId: ID!, input: UpdateAvailabilitySlotDto!): String!` | DOCTOR | Updates slot time or status (`AVAILABLE`, `LOCKED`, etc.). |
+| `Mutation` | `deleteAvailabilitySlot(slotId: ID!): String!` | DOCTOR | Deletes an unbooked availability slot. |
+| `Query` | `getDoctorAvailability(doctorId: ID!, fromDate: DateTime): [AvailabilitySlotEntity!]!` | Public | Fetches available upcoming slots for a specific doctor. |
+| `Query` | `myAvailabilitySlots: [AvailabilitySlotEntity!]!` | DOCTOR | Retrieves all slots created by the logged-in doctor. |
+| `Query` | `getAvailabilitySlotById(slotId: ID!): AvailabilitySlotEntity!` | Protected | Fetches single slot by ID. |
 
-```bash
-$ bun install -g @nestjs/mau
-$ mau deploy
+```graphql
+# Example: Bulk Create Slots (e.g. 30-min intervals)
+mutation CreateBulkSlots($input: BulkCreateSlotsDto!) {
+  createBulkAvailabilitySlots(input: $input)
+}
+
+# Example: Check Doctor Availability
+query GetDoctorAvailability($doctorId: ID!, $fromDate: DateTime) {
+  getDoctorAvailability(doctorId: $doctorId, fromDate: $fromDate) {
+    slot_id
+    start_time
+    end_time
+    status
+  }
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Observability
+### Consultation Operations
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+| Type | Operation | Access | Description |
+|---|---|---|---|
+| `Mutation` | `bookConsultation(input: CreateConsultationDto!): String!` | PATIENT | Reserves slot and books consultation. |
+| `Mutation` | `rescheduleConsultation(input: RescheduleConsultationDto!): String!` | Protected | Swaps to a new available slot and reschedules consultation. |
+| `Mutation` | `cancelConsultation(consultationId: ID!, reason: String): String!` | Protected | Cancels consultation and releases slot back to `AVAILABLE`. |
+| `Mutation` | `completeConsultation(consultationId: ID!, notes: String): String!` | DOCTOR | Marks consultation `COMPLETED` and saves consultation notes. |
+| `Query` | `getConsultationById(consultationId: ID!): ConsultationEntity!` | Protected | Retrieves detailed consultation by ID. |
+| `Query` | `myConsultations: [ConsultationEntity!]!` | Protected | Lists consultations for the current user (as patient or doctor). |
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+```graphql
+# Example: Book Consultation
+mutation BookConsultation($input: CreateConsultationDto!) {
+  bookConsultation(input: $input)
+}
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project:
-
-```bash
-$ bun install @nestjs/observe
+# Example: Get My Consultations
+query MyConsultations {
+  myConsultations {
+    consultation_id
+    scheduled_at
+    consultation_type
+    status
+    reason
+    doctor {
+      specialization
+      user {
+        profile {
+          full_name
+        }
+      }
+    }
+  }
+}
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/overview) - it takes a single import and an app key.
+---
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+### Prescription Operations
 
-## Resources
+| Type | Operation | Access | Description |
+|---|---|---|---|
+| `Mutation` | `createPrescription(input: CreatePrescriptionDto!): String!` | DOCTOR | Creates digital prescription for a consultation. |
+| `Mutation` | `updatePrescription(prescriptionId: ID!, input: UpdatePrescriptionDto!): String!` | DOCTOR | Updates existing prescription details. |
+| `Query` | `getPrescriptionById(prescriptionId: ID!): PrescriptionEntity!` | Protected | Retrieves prescription by ID. |
+| `Query` | `getPrescriptionsByConsultation(consultationId: ID!): [PrescriptionEntity!]!` | Protected | Retrieves prescription for a given consultation. |
+| `Query` | `myPrescriptions: [PrescriptionEntity!]!` | Protected | Returns all prescriptions for current user (patient or doctor). |
 
-Check out a few resources that may come in handy when working with NestJS:
+```graphql
+# Example: Create Prescription
+mutation CreatePrescription($input: CreatePrescriptionDto!) {
+  createPrescription(input: $input)
+}
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Example: View Prescriptions
+query MyPrescriptions {
+  myPrescriptions {
+    prescription_id
+    diagnosis
+    notes
+    medications {
+      name
+      dosage
+      frequency
+      duration
+      instructions
+    }
+    created_at
+  }
+}
+```
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Payment Operations
 
-## Stay in touch
+| Type | Operation | Access | Description |
+|---|---|---|---|
+| `Mutation` | `createPayment(input: CreatePaymentDto!): String!` | PATIENT | Initializes a payment record for a consultation. |
+| `Mutation` | `processPayment(input: ProcessPaymentDto!): String!` | PATIENT | Completes payment transaction and confirms consultation. |
+| `Mutation` | `refundPayment(paymentId: ID!): String!` | Protected | Marks payment refunded and updates records. |
+| `Query` | `getPaymentById(paymentId: ID!): PaymentEntity!` | Protected | Fetches payment record by ID. |
+| `Query` | `getPaymentsByConsultation(consultationId: ID!): [PaymentEntity!]!` | Protected | Fetches payments for a specific consultation. |
+| `Query` | `myPayments: [PaymentEntity!]!` | Protected | Fetches all payment records involving current user. |
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```graphql
+# Example: Initialize Payment
+mutation CreatePayment($input: CreatePaymentDto!) {
+  createPayment(input: $input)
+}
 
-## License
+# Example: Process Payment
+mutation ProcessPayment($input: ProcessPaymentDto!) {
+  processPayment(input: $input)
+}
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+# Example: My Payments
+query MyPayments {
+  myPayments {
+    payment_id
+    amount
+    currency
+    status
+    payment_method
+    transaction_id
+    created_at
+  }
+}
+```
+
+---
+
+## Authentication & Security
+
+- **Global Guard**: `PublicApiGuard` protects all endpoints by default unless explicitly decorated with `@Public()`.
+- **Token Extraction**: Handled automatically in `AuthMiddleware`:
+  - `Authorization: Bearer <JWT>`
+  - `Cookie: jwt_access_token=<JWT>`
+- **User Context**: `@CurrentUser()` decorator provides the decoded `JwtPayload` (`sub`, `email`, `role`) directly into resolvers.
+- **Service Verification Fallback**: Services verify user identity and role directly against the database for mission-critical mutations.
+
+---
+
+## Environment Configuration
+
+Configure the following variables in `api/.env`:
+
+```env
+# Application
+NODE_ENV=development
+PORT=8000
+GRAPHQL_PLAYGROUND=true
+
+# Database (PostgreSQL / Supabase)
+DATABASE_URL=postgresql://<user>:<password>@<host>:5432/<dbname>
+DATABASE_SSL=true
+
+# Authentication & Cryptography
+JWT_SECRET=your-secure-jwt-secret
+JWT_EXPIRES_IN=7d
+JWT_COOKIE_NAME=jwt_access_token
+JWT_COOKIE_MAX_AGE=604800000
+BCRYPT_SALT_ROUNDS=10
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js (v20+) or [Bun](https://bun.sh/)
+- PostgreSQL database instance
+
+### 1. Installation
+```bash
+# Using bun
+bun install
+
+# Or using npm
+npm install
+```
+
+### 2. Start Development Server
+```bash
+# Using bun
+bun run start:dev
+
+# Or using npm
+npm run start:dev
+```
+
+The GraphQL playground/Apollo Sandbox will be available at:
+`http://localhost:8000/graphql`
+
+### 3. Build for Production
+```bash
+bun run build
+# or
+npm run build
+```
+
+---
+
+## Testing & Tooling
+
+- **Linter**: `npm run lint` (powered by `oxlint`)
+- **Unit / Feature Tests**: `bun test` or `npm run test`
+- **Bruno Collection**: API request collections are located in `api/.bruno/` for quick exploration.
