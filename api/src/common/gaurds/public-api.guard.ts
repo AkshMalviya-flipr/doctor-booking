@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Reflector } from '@nestjs/core';
@@ -16,7 +21,7 @@ import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
  */
 @Injectable()
 export class PublicApiGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) { }
+  constructor(private readonly reflector: Reflector) {}
   canActivate(context: ExecutionContext): boolean {
     // Allow routes marked with @Public() to bypass auth
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -28,7 +33,9 @@ export class PublicApiGuard implements CanActivate {
     }
 
     const request = this.getRequest(context);
-    const authHeader = request?.headers?.['authorization'] || request?.headers?.['Authorization'];
+    const authHeader =
+      request?.headers?.['authorization'] ||
+      request?.headers?.['Authorization'];
 
     if (!authHeader) {
       // No token supplied – reject the request.

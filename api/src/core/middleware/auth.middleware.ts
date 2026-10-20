@@ -1,4 +1,9 @@
-import { Injectable, NestMiddleware, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response, NextFunction } from 'express';
 
@@ -15,7 +20,7 @@ import { Request, Response, NextFunction } from 'express';
 export class AuthMiddleware implements NestMiddleware {
   private readonly logger = new Logger(AuthMiddleware.name);
 
-  constructor(private readonly jwtService: JwtService) { }
+  constructor(private readonly jwtService: JwtService) {}
 
   use(req: Request, res: Response, next: NextFunction) {
     let token: string | undefined;
@@ -28,11 +33,14 @@ export class AuthMiddleware implements NestMiddleware {
 
     // 2. Fallback: extract token from cookies (access_token)
     if (!token && req.headers.cookie) {
-      const cookies = req.headers.cookie.split(';').reduce((acc, cur) => {
-        const [key, val] = cur.trim().split('=');
-        if (key && val) acc[key] = val;
-        return acc;
-      }, {} as Record<string, string>);
+      const cookies = req.headers.cookie.split(';').reduce(
+        (acc, cur) => {
+          const [key, val] = cur.trim().split('=');
+          if (key && val) acc[key] = val;
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
       token = cookies['access_token'];
     }
 
@@ -49,8 +57,13 @@ export class AuthMiddleware implements NestMiddleware {
       // Attach decoded payload to request for later use (e.g., guards, controllers)
       (req as any).user = decoded;
     } catch (err) {
-      this.logger.error('Invalid or expired JWT token', err instanceof Error ? err.stack : err);
-      throw new UnauthorizedException('Authentication token is missing or invalid');
+      this.logger.error(
+        'Invalid or expired JWT token',
+        err instanceof Error ? err.stack : err,
+      );
+      throw new UnauthorizedException(
+        'Authentication token is missing or invalid',
+      );
     }
 
     next();
