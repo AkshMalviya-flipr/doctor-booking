@@ -1,0 +1,29 @@
+meta {
+  name: Login
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{graphqlUrl}}
+  body: graphql
+  auth: none
+}
+
+body:graphql {
+  mutation Login($input: LoginInput!) {
+    login(input: $input) {
+      success
+      message
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "input": {
+      "email": "user@example.com",
+      "password": "strongpassword"
+    }
+  }
+}
