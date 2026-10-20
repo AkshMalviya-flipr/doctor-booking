@@ -7,13 +7,15 @@ import cors from 'cors';
 import { GraphqlModule } from './core/graphql/graphql.module';
 import { DatabaseModule } from './core/database/database.module';
 import { PaginationModule } from './common/pagination/pagination.module';
+import { AuthModule } from './features/auth/auth.module';
+import { AuthMiddleware } from './core/middleware/auth.middleware';
 
 @Module({
-  imports: [GraphqlModule, DatabaseModule, PaginationModule],
+  imports: [GraphqlModule, DatabaseModule, PaginationModule, AuthModule],
   providers: [{ provide: APP_GUARD, useClass: PublicApiGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(helmet(), cors()).forRoutes('*');
+    consumer.apply(helmet(), cors(), AuthMiddleware).forRoutes('*');
   }
 }

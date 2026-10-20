@@ -7,21 +7,22 @@ import {
 import { Request } from 'express';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { IS_PUBLIC_KEY } from '../decorator/public.decorator';
+import { extractTokenFromRequest } from '../../utils/cookie/cookie.util';
 
 /**
- * PublicApiGuard
- *
- * This guard protects public API endpoints by ensuring that an
- * Authorization header containing a JWT token (or API key) is present.
- * It does **not** validate the token's contents – that responsibility
- * should be delegated to a dedicated authentication service. The guard
- * simply blocks requests that lack the required credential, returning a
- * 401 Unauthorized response.
+ * PublicApiGuard protects all endpoints by default unless explicitly
+ * marked with the @Public() decorator. For non-public routes, it validates
+ * the JWT token from the Authorization header or authentication cookies.
  */
 @Injectable()
 export class PublicApiGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly jwtService: JwtService,
+  ) {}
+
   canActivate(context: ExecutionContext): boolean {
     // Allow routes marked with @Public() to bypass auth
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -33,16 +34,27 @@ export class PublicApiGuard implements CanActivate {
     }
 
     const request = this.getRequest(context);
-    const authHeader =
-      request?.headers?.['authorization'] ||
-      request?.headers?.['Authorization'];
+    const token = extractTokenFromRequest(request);
 
-    if (!authHeader) {
-      // No token supplied – reject the request.
-      throw new UnauthorizedException('Missing Authorization header');
+    if (!token) {
+      throw new UnauthorizedException(
+        'Missing Authorization header or authentication cookie',
+      );
     }
 
-    // Token is present – allow the request to proceed.
+    try {
+      const decoded = this.jwtService.verify(token, {
+        secret:
+          process.env.JWT_SECRET ||
+          'super-secret-jwt-key-for-development-change-in-prod',
+      });
+      (request as any).user = decoded;
+    } catch {
+      throw new UnauthorizedException(
+        'Authentication token is invalid or has expired',
+      );
+    }
+
     return true;
   }
 
