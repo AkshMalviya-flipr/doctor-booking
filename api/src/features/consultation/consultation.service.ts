@@ -13,15 +13,10 @@ import { Consultation } from '../../schema/consultation.entity';
 import { Doctor } from '../../schema/doctor.entity';
 import { User } from '../../schema/user.entity';
 import { AvailabilitySlot } from '../../schema/availability_slot.entity';
-import { ConsultationType } from '../../common/enum/consultation-type.enum';
-import { VerificationStatus } from '../../common/enum/verification-status.enum';
 import { handleServiceError } from '../../utils/error/error.util';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { RescheduleConsultationDto } from './dto/reschedule-consultation.dto';
 import { ConsultationEntity } from './entities/consultation.entity';
-import { DoctorEntity } from '../doctor/entities/doctor.entity';
-import { UserEntity } from '../auth/entities/user.entity';
-import { ProfileEntity } from '../auth/entities/profile.entity';
 
 @Injectable()
 export class ConsultationService {
@@ -44,12 +39,12 @@ export class ConsultationService {
   async bookConsultation(
     patientUserId: string,
     createDto: CreateConsultationDto,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     try {
       // 1. Fetch doctor and check validity
       const doctor = await this.doctorRepository.findOne({
         where: { doctor_id: createDto.doctor_id },
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
       });
 
       if (!doctor) {
@@ -66,7 +61,7 @@ export class ConsultationService {
       // 2. Fetch patient user
       const patient = await this.userRepository.findOne({
         where: { user_id: patientUserId },
-        relations: ['profile'],
+        relations: { profile: true },
       });
 
       if (!patient) {
@@ -111,13 +106,9 @@ export class ConsultationService {
         status: 'BOOKED',
       });
 
-      const savedConsultation =
-        await this.consultationRepository.save(consultation);
-      savedConsultation.patient = patient;
-      savedConsultation.doctor = doctor;
-      savedConsultation.slot = slot;
+      await this.consultationRepository.save(consultation);
 
-      return this.mapToConsultationEntity(savedConsultation);
+      return 'Consultation booked successfully';
     } catch (error) {
       handleServiceError(error, this.logger, 'ConsultationService.bookConsultation');
     }
@@ -129,18 +120,15 @@ export class ConsultationService {
   async rescheduleConsultation(
     userId: string,
     rescheduleDto: RescheduleConsultationDto,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: rescheduleDto.consultation_id },
-        relations: [
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-          'patient',
-          'patient.profile',
-          'slot',
-        ],
+        relations: {
+          doctor: { user: { profile: true } },
+          patient: { profile: true },
+          slot: true,
+        },
       });
 
       if (!consultation) {
@@ -211,10 +199,9 @@ export class ConsultationService {
       }
 
       consultation.scheduled_at = rescheduleDto.scheduled_at;
-      const updatedConsultation =
-        await this.consultationRepository.save(consultation);
+      await this.consultationRepository.save(consultation);
 
-      return this.mapToConsultationEntity(updatedConsultation);
+      return 'Consultation rescheduled successfully';
     } catch (error) {
       handleServiceError(
         error,
@@ -231,18 +218,15 @@ export class ConsultationService {
     userId: string,
     consultationId: string,
     reason?: string,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: consultationId },
-        relations: [
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-          'patient',
-          'patient.profile',
-          'slot',
-        ],
+        relations: {
+          doctor: { user: { profile: true } },
+          patient: { profile: true },
+          slot: true,
+        },
       });
 
       if (!consultation) {
@@ -286,9 +270,8 @@ export class ConsultationService {
           : `Cancellation reason: ${reason}`;
       }
 
-      const updatedConsultation =
-        await this.consultationRepository.save(consultation);
-      return this.mapToConsultationEntity(updatedConsultation);
+      await this.consultationRepository.save(consultation);
+      return 'Consultation cancelled successfully';
     } catch (error) {
       handleServiceError(
         error,
@@ -305,17 +288,14 @@ export class ConsultationService {
     doctorUserId: string,
     consultationId: string,
     notes?: string,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: consultationId },
-        relations: [
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-          'patient',
-          'patient.profile',
-        ],
+        relations: {
+          doctor: { user: { profile: true } },
+          patient: { profile: true },
+        },
       });
 
       if (!consultation) {
@@ -337,9 +317,8 @@ export class ConsultationService {
         consultation.notes = notes;
       }
 
-      const updatedConsultation =
-        await this.consultationRepository.save(consultation);
-      return this.mapToConsultationEntity(updatedConsultation);
+      await this.consultationRepository.save(consultation);
+      return 'Consultation completed successfully';
     } catch (error) {
       handleServiceError(
         error,
@@ -359,13 +338,10 @@ export class ConsultationService {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: consultationId },
-        relations: [
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-          'patient',
-          'patient.profile',
-        ],
+        relations: {
+          doctor: { user: { profile: true } },
+          patient: { profile: true },
+        },
       });
 
       if (!consultation) {
@@ -381,7 +357,7 @@ export class ConsultationService {
         );
       }
 
-      return this.mapToConsultationEntity(consultation);
+      return consultation as unknown as ConsultationEntity;
     } catch (error) {
       handleServiceError(
         error,
@@ -407,17 +383,14 @@ export class ConsultationService {
 
       const consultations = await this.consultationRepository.find({
         where: whereConditions,
-        relations: [
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-          'patient',
-          'patient.profile',
-        ],
+        relations: {
+          doctor: { user: { profile: true } },
+          patient: { profile: true },
+        },
         order: { scheduled_at: 'DESC' },
       });
 
-      return consultations.map((c) => this.mapToConsultationEntity(c));
+      return consultations as unknown as ConsultationEntity[];
     } catch (error) {
       handleServiceError(
         error,
@@ -425,111 +398,5 @@ export class ConsultationService {
         'ConsultationService.myConsultations',
       );
     }
-  }
-
-  /**
-   * Helper: Map TypeORM Consultation to GraphQL ConsultationEntity.
-   */
-  private mapToConsultationEntity(
-    consultation: Consultation,
-  ): ConsultationEntity {
-    let patientEntity: UserEntity | null = null;
-    let doctorEntity: DoctorEntity | null = null;
-
-    if (consultation.patient) {
-      let profileEntity: ProfileEntity | null = null;
-      if (consultation.patient.profile) {
-        profileEntity = {
-          profile_id: consultation.patient.profile.profile_id,
-          user_id: consultation.patient.profile.user_id,
-          full_name: consultation.patient.profile.full_name,
-          date_of_birth: consultation.patient.profile.date_of_birth,
-          gender: consultation.patient.profile.gender,
-          phone: consultation.patient.profile.phone,
-          address: consultation.patient.profile.address,
-          profile_image_url: consultation.patient.profile.profile_image_url,
-          created_at: consultation.patient.profile.created_at,
-          updated_at: consultation.patient.profile.updated_at,
-        };
-      }
-
-      patientEntity = {
-        user_id: consultation.patient.user_id,
-        email: consultation.patient.email,
-        role: consultation.patient.role,
-        status: consultation.patient.status,
-        email_verified: consultation.patient.email_verified,
-        last_login_at: consultation.patient.last_login_at,
-        created_at: consultation.patient.created_at,
-        updated_at: consultation.patient.updated_at,
-        profile: profileEntity,
-      };
-    }
-
-    if (consultation.doctor) {
-      let doctorUserEntity: UserEntity | null = null;
-      if (consultation.doctor.user) {
-        let doctorProfileEntity: ProfileEntity | null = null;
-        if (consultation.doctor.user.profile) {
-          doctorProfileEntity = {
-            profile_id: consultation.doctor.user.profile.profile_id,
-            user_id: consultation.doctor.user.profile.user_id,
-            full_name: consultation.doctor.user.profile.full_name,
-            date_of_birth: consultation.doctor.user.profile.date_of_birth,
-            gender: consultation.doctor.user.profile.gender,
-            phone: consultation.doctor.user.profile.phone,
-            address: consultation.doctor.user.profile.address,
-            profile_image_url:
-              consultation.doctor.user.profile.profile_image_url,
-            created_at: consultation.doctor.user.profile.created_at,
-            updated_at: consultation.doctor.user.profile.updated_at,
-          };
-        }
-
-        doctorUserEntity = {
-          user_id: consultation.doctor.user.user_id,
-          email: consultation.doctor.user.email,
-          role: consultation.doctor.user.role,
-          status: consultation.doctor.user.status,
-          email_verified: consultation.doctor.user.email_verified,
-          last_login_at: consultation.doctor.user.last_login_at,
-          created_at: consultation.doctor.user.created_at,
-          updated_at: consultation.doctor.user.updated_at,
-          profile: doctorProfileEntity,
-        };
-      }
-
-      doctorEntity = {
-        doctor_id: consultation.doctor.doctor_id,
-        user_id: consultation.doctor.user_id,
-        specialization: consultation.doctor.specialization,
-        license_number: consultation.doctor.license_number,
-        qualification: consultation.doctor.qualification,
-        experience_years: consultation.doctor.experience_years,
-        consultation_fee: consultation.doctor.consultation_fee,
-        verification_status:
-          consultation.doctor.verification_status as VerificationStatus,
-        bio: consultation.doctor.bio,
-        created_at: consultation.doctor.created_at,
-        updated_at: consultation.doctor.updated_at,
-        user: doctorUserEntity,
-      };
-    }
-
-    return {
-      consultation_id: consultation.consultation_id,
-      patient_id: consultation.patient_id,
-      doctor_id: consultation.doctor_id,
-      slot_id: consultation.slot_id,
-      scheduled_at: consultation.scheduled_at,
-      consultation_type: consultation.consultation_type as ConsultationType,
-      reason: consultation.reason,
-      status: consultation.status,
-      notes: consultation.notes,
-      created_at: consultation.created_at,
-      updated_at: consultation.updated_at,
-      patient: patientEntity,
-      doctor: doctorEntity,
-    };
   }
 }

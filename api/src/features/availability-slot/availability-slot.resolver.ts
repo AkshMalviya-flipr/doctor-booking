@@ -18,47 +18,55 @@ export class AvailabilitySlotResolver {
     private readonly availabilitySlotService: AvailabilitySlotService,
   ) {}
 
-  @Mutation(() => AvailabilitySlotEntity)
+  @Mutation(() => String)
   async createAvailabilitySlot(
     @Args('input') createDto: CreateAvailabilitySlotDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<AvailabilitySlotEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
-      throw new UnauthorizedException('Authentication credentials were not provided');
+      throw new UnauthorizedException(
+        'Authentication credentials were not provided',
+      );
     }
     return this.availabilitySlotService.createSlot(user.sub, createDto);
   }
 
-  @Mutation(() => [AvailabilitySlotEntity])
+  @Mutation(() => String)
   async createBulkAvailabilitySlots(
     @Args('input') bulkDto: BulkCreateSlotsDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<AvailabilitySlotEntity[]> {
+  ): Promise<string> {
     if (!user?.sub) {
-      throw new UnauthorizedException('Authentication credentials were not provided');
+      throw new UnauthorizedException(
+        'Authentication credentials were not provided',
+      );
     }
     return this.availabilitySlotService.createBulkSlots(user.sub, bulkDto);
   }
 
-  @Mutation(() => AvailabilitySlotEntity)
+  @Mutation(() => String)
   async updateAvailabilitySlot(
     @Args('slotId', { type: () => ID }) slotId: string,
     @Args('input') updateDto: UpdateAvailabilitySlotDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<AvailabilitySlotEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
-      throw new UnauthorizedException('Authentication credentials were not provided');
+      throw new UnauthorizedException(
+        'Authentication credentials were not provided',
+      );
     }
     return this.availabilitySlotService.updateSlot(user.sub, slotId, updateDto);
   }
 
-  @Mutation(() => Boolean)
+  @Mutation(() => String)
   async deleteAvailabilitySlot(
     @Args('slotId', { type: () => ID }) slotId: string,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<boolean> {
+  ): Promise<string> {
     if (!user?.sub) {
-      throw new UnauthorizedException('Authentication credentials were not provided');
+      throw new UnauthorizedException(
+        'Authentication credentials were not provided',
+      );
     }
     return this.availabilitySlotService.deleteSlot(user.sub, slotId);
   }
@@ -69,7 +77,10 @@ export class AvailabilitySlotResolver {
     @Args('doctorId', { type: () => ID }) doctorId: string,
     @Args('fromDate', { type: () => Date, nullable: true }) fromDate?: Date,
   ): Promise<AvailabilitySlotEntity[]> {
-    return this.availabilitySlotService.getDoctorAvailability(doctorId, fromDate);
+    return this.availabilitySlotService.getDoctorAvailability(
+      doctorId,
+      fromDate,
+    );
   }
 
   @Query(() => [AvailabilitySlotEntity])
@@ -77,9 +88,11 @@ export class AvailabilitySlotResolver {
     @CurrentUser() user: JwtPayload | undefined,
   ): Promise<AvailabilitySlotEntity[]> {
     if (!user?.sub) {
-      throw new UnauthorizedException('Authentication credentials were not provided');
+      throw new UnauthorizedException(
+        'Authentication credentials were not provided',
+      );
     }
-    return this.availabilitySlotService.mySlots(user.sub);
+    return this.availabilitySlotService.myAvailabilitySlots(user.sub);
   }
 
   @Query(() => AvailabilitySlotEntity)

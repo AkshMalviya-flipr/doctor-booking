@@ -11,15 +11,11 @@ import { Repository } from 'typeorm';
 
 import { AvailabilitySlot } from '../../schema/availability_slot.entity';
 import { Doctor } from '../../schema/doctor.entity';
-import { VerificationStatus } from '../../common/enum/verification-status.enum';
 import { handleServiceError } from '../../utils/error/error.util';
 import { CreateAvailabilitySlotDto } from './dto/create-slot.dto';
 import { UpdateAvailabilitySlotDto } from './dto/update-slot.dto';
 import { BulkCreateSlotsDto } from './dto/bulk-create-slots.dto';
 import { AvailabilitySlotEntity } from './entities/availability-slot.entity';
-import { DoctorEntity } from '../doctor/entities/doctor.entity';
-import { UserEntity } from '../auth/entities/user.entity';
-import { ProfileEntity } from '../auth/entities/profile.entity';
 
 @Injectable()
 export class AvailabilitySlotService {
@@ -38,11 +34,11 @@ export class AvailabilitySlotService {
   async createSlot(
     userId: string,
     createDto: CreateAvailabilitySlotDto,
-  ): Promise<AvailabilitySlotEntity> {
+  ): Promise<string> {
     try {
       const doctor = await this.doctorRepository.findOne({
         where: { user_id: userId },
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
       });
 
       if (!doctor) {
@@ -53,11 +49,15 @@ export class AvailabilitySlotService {
       const end = new Date(createDto.end_time);
 
       if (start >= end) {
-        throw new BadRequestException('Start time must be strictly before end time');
+        throw new BadRequestException(
+          'Start time must be strictly before end time',
+        );
       }
 
       if (start.getTime() < Date.now() - 60000) {
-        throw new BadRequestException('Cannot create availability slots in the past');
+        throw new BadRequestException(
+          'Cannot create availability slots in the past',
+        );
       }
 
       // Check for overlapping slots
@@ -84,12 +84,15 @@ export class AvailabilitySlotService {
         status: 'AVAILABLE',
       });
 
-      const savedSlot = await this.slotRepository.save(slot);
-      savedSlot.doctor = doctor;
+      await this.slotRepository.save(slot);
 
-      return this.mapToSlotEntity(savedSlot);
+      return 'Availability slot created successfully';
     } catch (error) {
-      handleServiceError(error, this.logger, 'AvailabilitySlotService.createSlot');
+      handleServiceError(
+        error,
+        this.logger,
+        'AvailabilitySlotService.createSlot',
+      );
     }
   }
 
@@ -99,11 +102,11 @@ export class AvailabilitySlotService {
   async createBulkSlots(
     userId: string,
     bulkDto: BulkCreateSlotsDto,
-  ): Promise<AvailabilitySlotEntity[]> {
+  ): Promise<string> {
     try {
       const doctor = await this.doctorRepository.findOne({
         where: { user_id: userId },
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
       });
 
       if (!doctor) {
@@ -119,7 +122,9 @@ export class AvailabilitySlotService {
       }
 
       if (windowStart < Date.now() - 60000) {
-        throw new BadRequestException('Cannot create availability slots in the past');
+        throw new BadRequestException(
+          'Cannot create availability slots in the past',
+        );
       }
 
       const slotsToCreate: AvailabilitySlot[] = [];
@@ -144,12 +149,9 @@ export class AvailabilitySlotService {
         );
       }
 
-      const savedSlots = await this.slotRepository.save(slotsToCreate);
+      await this.slotRepository.save(slotsToCreate);
 
-      return savedSlots.map((slot) => {
-        slot.doctor = doctor;
-        return this.mapToSlotEntity(slot);
-      });
+      return 'Availability slots created successfully';
     } catch (error) {
       handleServiceError(
         error,
@@ -166,11 +168,11 @@ export class AvailabilitySlotService {
     userId: string,
     slotId: string,
     updateDto: UpdateAvailabilitySlotDto,
-  ): Promise<AvailabilitySlotEntity> {
+  ): Promise<string> {
     try {
       const slot = await this.slotRepository.findOne({
         where: { slot_id: slotId },
-        relations: ['doctor', 'doctor.user', 'doctor.user.profile'],
+        relations: { doctor: { user: { profile: true } } },
       });
 
       if (!slot) {
@@ -201,28 +203,34 @@ export class AvailabilitySlotService {
       }
 
       if (slot.start_time >= slot.end_time) {
-        throw new BadRequestException('Start time must be strictly before end time');
+        throw new BadRequestException(
+          'Start time must be strictly before end time',
+        );
       }
 
       if (updateDto.status) {
         slot.status = updateDto.status;
       }
 
-      const updatedSlot = await this.slotRepository.save(slot);
-      return this.mapToSlotEntity(updatedSlot);
+      await this.slotRepository.save(slot);
+      return 'Availability slot updated successfully';
     } catch (error) {
-      handleServiceError(error, this.logger, 'AvailabilitySlotService.updateSlot');
+      handleServiceError(
+        error,
+        this.logger,
+        'AvailabilitySlotService.updateSlot',
+      );
     }
   }
 
   /**
    * Delete: Remove or cancel an unbooked availability slot.
    */
-  async deleteSlot(userId: string, slotId: string): Promise<boolean> {
+  async deleteSlot(userId: string, slotId: string): Promise<string> {
     try {
       const slot = await this.slotRepository.findOne({
         where: { slot_id: slotId },
-        relations: ['doctor'],
+        relations: { doctor: true },
       });
 
       if (!slot) {
@@ -242,9 +250,13 @@ export class AvailabilitySlotService {
       }
 
       await this.slotRepository.remove(slot);
-      return true;
+      return 'Availability slot deleted successfully';
     } catch (error) {
-      handleServiceError(error, this.logger, 'AvailabilitySlotService.deleteSlot');
+      handleServiceError(
+        error,
+        this.logger,
+        'AvailabilitySlotService.deleteSlot',
+      );
     }
   }
 
@@ -269,7 +281,7 @@ export class AvailabilitySlotService {
       query.orderBy('slot.start_time', 'ASC');
 
       const slots = await query.getMany();
-      return slots.map((s) => this.mapToSlotEntity(s));
+      return slots as unknown as AvailabilitySlotEntity[];
     } catch (error) {
       handleServiceError(
         error,
@@ -294,11 +306,11 @@ export class AvailabilitySlotService {
 
       const slots = await this.slotRepository.find({
         where: { doctor_id: doctor.doctor_id },
-        relations: ['doctor', 'doctor.user', 'doctor.user.profile'],
+        relations: { doctor: { user: { profile: true } } },
         order: { start_time: 'ASC' },
       });
 
-      return slots.map((s) => this.mapToSlotEntity(s));
+      return slots as unknown as AvailabilitySlotEntity[];
     } catch (error) {
       handleServiceError(
         error,
@@ -315,14 +327,14 @@ export class AvailabilitySlotService {
     try {
       const slot = await this.slotRepository.findOne({
         where: { slot_id: slotId },
-        relations: ['doctor', 'doctor.user', 'doctor.user.profile'],
+        relations: { doctor: { user: { profile: true } } },
       });
 
       if (!slot) {
         throw new NotFoundException('Availability slot not found');
       }
 
-      return this.mapToSlotEntity(slot);
+      return slot as unknown as AvailabilitySlotEntity;
     } catch (error) {
       handleServiceError(
         error,
@@ -330,72 +342,5 @@ export class AvailabilitySlotService {
         'AvailabilitySlotService.getSlotById',
       );
     }
-  }
-
-  /**
-   * Helper: Map TypeORM AvailabilitySlot to GraphQL AvailabilitySlotEntity.
-   */
-  private mapToSlotEntity(slot: AvailabilitySlot): AvailabilitySlotEntity {
-    let doctorEntity: DoctorEntity | null = null;
-
-    if (slot.doctor) {
-      let doctorUserEntity: UserEntity | null = null;
-      if (slot.doctor.user) {
-        let doctorProfileEntity: ProfileEntity | null = null;
-        if (slot.doctor.user.profile) {
-          doctorProfileEntity = {
-            profile_id: slot.doctor.user.profile.profile_id,
-            user_id: slot.doctor.user.profile.user_id,
-            full_name: slot.doctor.user.profile.full_name,
-            date_of_birth: slot.doctor.user.profile.date_of_birth,
-            gender: slot.doctor.user.profile.gender,
-            phone: slot.doctor.user.profile.phone,
-            address: slot.doctor.user.profile.address,
-            profile_image_url:
-              slot.doctor.user.profile.profile_image_url,
-            created_at: slot.doctor.user.profile.created_at,
-            updated_at: slot.doctor.user.profile.updated_at,
-          };
-        }
-
-        doctorUserEntity = {
-          user_id: slot.doctor.user.user_id,
-          email: slot.doctor.user.email,
-          role: slot.doctor.user.role,
-          status: slot.doctor.user.status,
-          email_verified: slot.doctor.user.email_verified,
-          last_login_at: slot.doctor.user.last_login_at,
-          created_at: slot.doctor.user.created_at,
-          updated_at: slot.doctor.user.updated_at,
-          profile: doctorProfileEntity,
-        };
-      }
-
-      doctorEntity = {
-        doctor_id: slot.doctor.doctor_id,
-        user_id: slot.doctor.user_id,
-        specialization: slot.doctor.specialization,
-        license_number: slot.doctor.license_number,
-        qualification: slot.doctor.qualification,
-        experience_years: slot.doctor.experience_years,
-        consultation_fee: slot.doctor.consultation_fee,
-        verification_status:
-          slot.doctor.verification_status as VerificationStatus,
-        bio: slot.doctor.bio,
-        created_at: slot.doctor.created_at,
-        updated_at: slot.doctor.updated_at,
-        user: doctorUserEntity,
-      };
-    }
-
-    return {
-      slot_id: slot.slot_id,
-      doctor_id: slot.doctor_id,
-      start_time: slot.start_time,
-      end_time: slot.end_time,
-      status: slot.status,
-      created_at: slot.created_at,
-      doctor: doctorEntity,
-    };
   }
 }

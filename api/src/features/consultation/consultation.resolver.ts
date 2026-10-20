@@ -14,46 +14,46 @@ import { ConsultationEntity } from './entities/consultation.entity';
 export class ConsultationResolver {
   constructor(private readonly consultationService: ConsultationService) {}
 
-  @Mutation(() => ConsultationEntity)
+  @Mutation(() => String)
   async bookConsultation(
     @Args('input') createDto: CreateConsultationDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.consultationService.bookConsultation(user.sub, createDto);
   }
 
-  @Mutation(() => ConsultationEntity)
+  @Mutation(() => String)
   async rescheduleConsultation(
     @Args('input') rescheduleDto: RescheduleConsultationDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.consultationService.rescheduleConsultation(user.sub, rescheduleDto);
   }
 
-  @Mutation(() => ConsultationEntity)
+  @Mutation(() => String)
   async cancelConsultation(
     @Args('consultationId', { type: () => ID }) consultationId: string,
     @Args('reason', { type: () => String, nullable: true }) reason: string | undefined,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.consultationService.cancelConsultation(user.sub, consultationId, reason);
   }
 
-  @Mutation(() => ConsultationEntity)
+  @Mutation(() => String)
   async completeConsultation(
     @Args('consultationId', { type: () => ID }) consultationId: string,
     @Args('notes', { type: () => String, nullable: true }) notes: string | undefined,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<ConsultationEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }

@@ -11,16 +11,10 @@ import { Repository } from 'typeorm';
 
 import { Payment } from '../../schema/payment.entity';
 import { Consultation } from '../../schema/consultation.entity';
-import { ConsultationType } from '../../common/enum/consultation-type.enum';
-import { VerificationStatus } from '../../common/enum/verification-status.enum';
 import { handleServiceError } from '../../utils/error/error.util';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ProcessPaymentDto } from './dto/process-payment.dto';
 import { PaymentEntity } from './entities/payment.entity';
-import { ConsultationEntity } from '../consultation/entities/consultation.entity';
-import { DoctorEntity } from '../doctor/entities/doctor.entity';
-import { UserEntity } from '../auth/entities/user.entity';
-import { ProfileEntity } from '../auth/entities/profile.entity';
 
 @Injectable()
 export class PaymentService {
@@ -39,17 +33,14 @@ export class PaymentService {
   async createPayment(
     patientUserId: string,
     createDto: CreatePaymentDto,
-  ): Promise<PaymentEntity> {
+  ): Promise<string> {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: createDto.consultation_id },
-        relations: [
-          'patient',
-          'patient.profile',
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-        ],
+        relations: {
+          patient: { profile: true },
+          doctor: { user: { profile: true } },
+        },
       });
 
       if (!consultation) {
@@ -91,10 +82,9 @@ export class PaymentService {
         paid_at: null,
       });
 
-      const savedPayment = await this.paymentRepository.save(payment);
-      savedPayment.consultation = consultation;
+      await this.paymentRepository.save(payment);
 
-      return this.mapToPaymentEntity(savedPayment);
+      return 'Payment initiated successfully';
     } catch (error) {
       handleServiceError(error, this.logger, 'PaymentService.createPayment');
     }
@@ -106,16 +96,16 @@ export class PaymentService {
   async processPayment(
     userId: string,
     processDto: ProcessPaymentDto,
-  ): Promise<PaymentEntity> {
+  ): Promise<string> {
     try {
       const payment = await this.paymentRepository.findOne({
         where: { payment_id: processDto.payment_id },
-        relations: [
-          'consultation',
-          'consultation.patient',
-          'consultation.doctor',
-          'consultation.doctor.user',
-        ],
+        relations: {
+          consultation: {
+            patient: true,
+            doctor: { user: true },
+          },
+        },
       });
 
       if (!payment) {
@@ -148,8 +138,8 @@ export class PaymentService {
         payment.paid_at = new Date();
       }
 
-      const updatedPayment = await this.paymentRepository.save(payment);
-      return this.mapToPaymentEntity(updatedPayment);
+      await this.paymentRepository.save(payment);
+      return 'Payment processed successfully';
     } catch (error) {
       handleServiceError(error, this.logger, 'PaymentService.processPayment');
     }
@@ -161,16 +151,16 @@ export class PaymentService {
   async refundPayment(
     userId: string,
     paymentId: string,
-  ): Promise<PaymentEntity> {
+  ): Promise<string> {
     try {
       const payment = await this.paymentRepository.findOne({
         where: { payment_id: paymentId },
-        relations: [
-          'consultation',
-          'consultation.patient',
-          'consultation.doctor',
-          'consultation.doctor.user',
-        ],
+        relations: {
+          consultation: {
+            patient: true,
+            doctor: { user: true },
+          },
+        },
       });
 
       if (!payment) {
@@ -200,9 +190,9 @@ export class PaymentService {
       }
 
       payment.payment_status = 'REFUNDED';
-      const updatedPayment = await this.paymentRepository.save(payment);
+      await this.paymentRepository.save(payment);
 
-      return this.mapToPaymentEntity(updatedPayment);
+      return 'Payment refunded successfully';
     } catch (error) {
       handleServiceError(error, this.logger, 'PaymentService.refundPayment');
     }
@@ -218,14 +208,12 @@ export class PaymentService {
     try {
       const payment = await this.paymentRepository.findOne({
         where: { payment_id: paymentId },
-        relations: [
-          'consultation',
-          'consultation.patient',
-          'consultation.patient.profile',
-          'consultation.doctor',
-          'consultation.doctor.user',
-          'consultation.doctor.user.profile',
-        ],
+        relations: {
+          consultation: {
+            patient: { profile: true },
+            doctor: { user: { profile: true } },
+          },
+        },
       });
 
       if (!payment) {
@@ -241,7 +229,7 @@ export class PaymentService {
         );
       }
 
-      return this.mapToPaymentEntity(payment);
+      return payment as unknown as PaymentEntity;
     } catch (error) {
       handleServiceError(error, this.logger, 'PaymentService.getPaymentById');
     }
@@ -257,7 +245,7 @@ export class PaymentService {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: consultationId },
-        relations: ['doctor', 'doctor.user'],
+        relations: { doctor: { user: true } },
       });
 
       if (!consultation) {
@@ -275,18 +263,16 @@ export class PaymentService {
 
       const payments = await this.paymentRepository.find({
         where: { consultation_id: consultationId },
-        relations: [
-          'consultation',
-          'consultation.patient',
-          'consultation.patient.profile',
-          'consultation.doctor',
-          'consultation.doctor.user',
-          'consultation.doctor.user.profile',
-        ],
+        relations: {
+          consultation: {
+            patient: { profile: true },
+            doctor: { user: { profile: true } },
+          },
+        },
         order: { created_at: 'DESC' },
       });
 
-      return payments.map((p) => this.mapToPaymentEntity(p));
+      return payments as unknown as PaymentEntity[];
     } catch (error) {
       handleServiceError(
         error,
@@ -316,142 +302,9 @@ export class PaymentService {
         .orderBy('payment.created_at', 'DESC')
         .getMany();
 
-      return payments.map((p) => this.mapToPaymentEntity(p));
+      return payments as unknown as PaymentEntity[];
     } catch (error) {
       handleServiceError(error, this.logger, 'PaymentService.myPayments');
     }
-  }
-
-  /**
-   * Helper: Map TypeORM Payment to GraphQL PaymentEntity.
-   */
-  private mapToPaymentEntity(payment: Payment): PaymentEntity {
-    let consultationEntity: ConsultationEntity | null = null;
-
-    if (payment.consultation) {
-      let patientEntity: UserEntity | null = null;
-      let doctorEntity: DoctorEntity | null = null;
-
-      if (payment.consultation.patient) {
-        let profileEntity: ProfileEntity | null = null;
-        if (payment.consultation.patient.profile) {
-          profileEntity = {
-            profile_id: payment.consultation.patient.profile.profile_id,
-            user_id: payment.consultation.patient.profile.user_id,
-            full_name: payment.consultation.patient.profile.full_name,
-            date_of_birth:
-              payment.consultation.patient.profile.date_of_birth,
-            gender: payment.consultation.patient.profile.gender,
-            phone: payment.consultation.patient.profile.phone,
-            address: payment.consultation.patient.profile.address,
-            profile_image_url:
-              payment.consultation.patient.profile.profile_image_url,
-            created_at: payment.consultation.patient.profile.created_at,
-            updated_at: payment.consultation.patient.profile.updated_at,
-          };
-        }
-
-        patientEntity = {
-          user_id: payment.consultation.patient.user_id,
-          email: payment.consultation.patient.email,
-          role: payment.consultation.patient.role,
-          status: payment.consultation.patient.status,
-          email_verified: payment.consultation.patient.email_verified,
-          last_login_at: payment.consultation.patient.last_login_at,
-          created_at: payment.consultation.patient.created_at,
-          updated_at: payment.consultation.patient.updated_at,
-          profile: profileEntity,
-        };
-      }
-
-      if (payment.consultation.doctor) {
-        let doctorUserEntity: UserEntity | null = null;
-        if (payment.consultation.doctor.user) {
-          let doctorProfileEntity: ProfileEntity | null = null;
-          if (payment.consultation.doctor.user.profile) {
-            doctorProfileEntity = {
-              profile_id:
-                payment.consultation.doctor.user.profile.profile_id,
-              user_id: payment.consultation.doctor.user.profile.user_id,
-              full_name:
-                payment.consultation.doctor.user.profile.full_name,
-              date_of_birth:
-                payment.consultation.doctor.user.profile.date_of_birth,
-              gender: payment.consultation.doctor.user.profile.gender,
-              phone: payment.consultation.doctor.user.profile.phone,
-              address: payment.consultation.doctor.user.profile.address,
-              profile_image_url:
-                payment.consultation.doctor.user.profile
-                  .profile_image_url,
-              created_at:
-                payment.consultation.doctor.user.profile.created_at,
-              updated_at:
-                payment.consultation.doctor.user.profile.updated_at,
-            };
-          }
-
-          doctorUserEntity = {
-            user_id: payment.consultation.doctor.user.user_id,
-            email: payment.consultation.doctor.user.email,
-            role: payment.consultation.doctor.user.role,
-            status: payment.consultation.doctor.user.status,
-            email_verified:
-              payment.consultation.doctor.user.email_verified,
-            last_login_at:
-              payment.consultation.doctor.user.last_login_at,
-            created_at: payment.consultation.doctor.user.created_at,
-            updated_at: payment.consultation.doctor.user.updated_at,
-            profile: doctorProfileEntity,
-          };
-        }
-
-        doctorEntity = {
-          doctor_id: payment.consultation.doctor.doctor_id,
-          user_id: payment.consultation.doctor.user_id,
-          specialization: payment.consultation.doctor.specialization,
-          license_number: payment.consultation.doctor.license_number,
-          qualification: payment.consultation.doctor.qualification,
-          experience_years: payment.consultation.doctor.experience_years,
-          consultation_fee: payment.consultation.doctor.consultation_fee,
-          verification_status:
-            payment.consultation.doctor
-              .verification_status as VerificationStatus,
-          bio: payment.consultation.doctor.bio,
-          created_at: payment.consultation.doctor.created_at,
-          updated_at: payment.consultation.doctor.updated_at,
-          user: doctorUserEntity,
-        };
-      }
-
-      consultationEntity = {
-        consultation_id: payment.consultation.consultation_id,
-        patient_id: payment.consultation.patient_id,
-        doctor_id: payment.consultation.doctor_id,
-        slot_id: payment.consultation.slot_id,
-        scheduled_at: payment.consultation.scheduled_at,
-        consultation_type:
-          payment.consultation.consultation_type as ConsultationType,
-        reason: payment.consultation.reason,
-        status: payment.consultation.status,
-        notes: payment.consultation.notes,
-        created_at: payment.consultation.created_at,
-        updated_at: payment.consultation.updated_at,
-        patient: patientEntity,
-        doctor: doctorEntity,
-      };
-    }
-
-    return {
-      payment_id: payment.payment_id,
-      consultation_id: payment.consultation_id,
-      amount: payment.amount,
-      currency: payment.currency,
-      payment_method: payment.payment_method,
-      payment_status: payment.payment_status,
-      transaction_reference: payment.transaction_reference,
-      paid_at: payment.paid_at,
-      created_at: payment.created_at,
-      consultation: consultationEntity,
-    };
   }
 }

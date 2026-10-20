@@ -14,23 +14,23 @@ import { PrescriptionEntity } from './entities/prescription.entity';
 export class PrescriptionResolver {
   constructor(private readonly prescriptionService: PrescriptionService) {}
 
-  @Mutation(() => PrescriptionEntity)
+  @Mutation(() => String)
   async createPrescription(
     @Args('input') createDto: CreatePrescriptionDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<PrescriptionEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.prescriptionService.createPrescription(user.sub, createDto);
   }
 
-  @Mutation(() => PrescriptionEntity)
+  @Mutation(() => String)
   async updatePrescription(
     @Args('prescriptionId', { type: () => ID }) prescriptionId: string,
     @Args('input') updateDto: UpdatePrescriptionDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<PrescriptionEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }

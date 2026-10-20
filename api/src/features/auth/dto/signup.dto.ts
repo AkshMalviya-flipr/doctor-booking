@@ -8,7 +8,6 @@ import {
   MinLength,
 } from 'class-validator';
 import { UserRole } from '../../../common/enum/user-role.enum';
-import '../entities/enum.registry';
 
 @InputType()
 export class SignupDto {

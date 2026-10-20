@@ -1,6 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { Gender } from '../../../common/enum/gender.enum';
-import './enum.registry';
 
 @ObjectType('UserProfile')
 export class ProfileEntity {

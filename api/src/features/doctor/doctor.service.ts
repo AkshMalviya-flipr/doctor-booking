@@ -15,8 +15,6 @@ import { handleServiceError } from '../../utils/error/error.util';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { DoctorEntity } from './entities/doctor.entity';
-import { UserEntity } from '../auth/entities/user.entity';
-import { ProfileEntity } from '../auth/entities/profile.entity';
 
 @Injectable()
 export class DoctorService {
@@ -35,7 +33,7 @@ export class DoctorService {
   async createDoctorProfile(
     userId: string,
     createDoctorDto: CreateDoctorDto,
-  ): Promise<DoctorEntity> {
+  ): Promise<string> {
     try {
       // 1. Check if doctor profile already exists for this account
       const existingDoctor = await this.doctorRepository.findOne({
@@ -62,7 +60,7 @@ export class DoctorService {
       // 3. Verify user account exists
       const user = await this.userRepository.findOne({
         where: { user_id: userId },
-        relations: ['profile'],
+        relations: { profile: true },
       });
 
       if (!user) {
@@ -87,10 +85,9 @@ export class DoctorService {
         bio: createDoctorDto.bio?.trim() || null,
       });
 
-      const savedDoctor = await this.doctorRepository.save(doctor);
-      savedDoctor.user = user;
+      await this.doctorRepository.save(doctor);
 
-      return this.mapToDoctorEntity(savedDoctor);
+      return 'Doctor profile created successfully';
     } catch (error) {
       handleServiceError(error, this.logger, 'DoctorService.createDoctorProfile');
     }
@@ -102,12 +99,12 @@ export class DoctorService {
   async updateDoctorProfile(
     userId: string,
     updateDoctorDto: UpdateDoctorDto,
-  ): Promise<DoctorEntity> {
+  ): Promise<string> {
     try {
       // 1. Find doctor profile belonging to the user
       const doctor = await this.doctorRepository.findOne({
         where: { user_id: userId },
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
       });
 
       if (!doctor) {
@@ -135,8 +132,8 @@ export class DoctorService {
         doctor.bio = updateDoctorDto.bio?.trim() || null;
       }
 
-      const updatedDoctor = await this.doctorRepository.save(doctor);
-      return this.mapToDoctorEntity(updatedDoctor);
+      await this.doctorRepository.save(doctor);
+      return 'Doctor profile updated successfully';
     } catch (error) {
       handleServiceError(error, this.logger, 'DoctorService.updateDoctorProfile');
     }
@@ -149,14 +146,14 @@ export class DoctorService {
     try {
       const doctor = await this.doctorRepository.findOne({
         where: { user_id: userId },
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
       });
 
       if (!doctor) {
         throw new NotFoundException('Doctor profile not found');
       }
 
-      return this.mapToDoctorEntity(doctor);
+      return doctor as unknown as DoctorEntity;
     } catch (error) {
       handleServiceError(error, this.logger, 'DoctorService.getDoctorProfile');
     }
@@ -169,14 +166,14 @@ export class DoctorService {
     try {
       const doctor = await this.doctorRepository.findOne({
         where: { doctor_id: doctorId },
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
       });
 
       if (!doctor) {
         throw new NotFoundException('Doctor not found');
       }
 
-      return this.mapToDoctorEntity(doctor);
+      return doctor as unknown as DoctorEntity;
     } catch (error) {
       handleServiceError(error, this.logger, 'DoctorService.getDoctorById');
     }
@@ -188,65 +185,13 @@ export class DoctorService {
   async listDoctors(): Promise<DoctorEntity[]> {
     try {
       const doctors = await this.doctorRepository.find({
-        relations: ['user', 'user.profile'],
+        relations: { user: { profile: true } },
         order: { created_at: 'DESC' },
       });
 
-      return doctors.map((doc) => this.mapToDoctorEntity(doc));
+      return doctors as unknown as DoctorEntity[];
     } catch (error) {
       handleServiceError(error, this.logger, 'DoctorService.listDoctors');
     }
-  }
-
-  /**
-   * Helper: Map TypeORM Doctor to GraphQL DoctorEntity.
-   */
-  private mapToDoctorEntity(doctor: Doctor): DoctorEntity {
-    let userEntity: UserEntity | null = null;
-
-    if (doctor.user) {
-      let profileEntity: ProfileEntity | null = null;
-      if (doctor.user.profile) {
-        profileEntity = {
-          profile_id: doctor.user.profile.profile_id,
-          user_id: doctor.user.profile.user_id,
-          full_name: doctor.user.profile.full_name,
-          date_of_birth: doctor.user.profile.date_of_birth,
-          gender: doctor.user.profile.gender,
-          phone: doctor.user.profile.phone,
-          address: doctor.user.profile.address,
-          profile_image_url: doctor.user.profile.profile_image_url,
-          created_at: doctor.user.profile.created_at,
-          updated_at: doctor.user.profile.updated_at,
-        };
-      }
-
-      userEntity = {
-        user_id: doctor.user.user_id,
-        email: doctor.user.email,
-        role: doctor.user.role,
-        status: doctor.user.status,
-        email_verified: doctor.user.email_verified,
-        last_login_at: doctor.user.last_login_at,
-        created_at: doctor.user.created_at,
-        updated_at: doctor.user.updated_at,
-        profile: profileEntity,
-      };
-    }
-
-    return {
-      doctor_id: doctor.doctor_id,
-      user_id: doctor.user_id,
-      specialization: doctor.specialization,
-      license_number: doctor.license_number,
-      qualification: doctor.qualification,
-      experience_years: doctor.experience_years,
-      consultation_fee: doctor.consultation_fee,
-      verification_status: doctor.verification_status as VerificationStatus,
-      bio: doctor.bio,
-      created_at: doctor.created_at,
-      updated_at: doctor.updated_at,
-      user: userEntity,
-    };
   }
 }

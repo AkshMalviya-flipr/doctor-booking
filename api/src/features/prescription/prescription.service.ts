@@ -10,17 +10,10 @@ import { Repository } from 'typeorm';
 
 import { Prescription } from '../../schema/prescription.entity';
 import { Consultation } from '../../schema/consultation.entity';
-import { ConsultationType } from '../../common/enum/consultation-type.enum';
-import { VerificationStatus } from '../../common/enum/verification-status.enum';
 import { handleServiceError } from '../../utils/error/error.util';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { PrescriptionEntity } from './entities/prescription.entity';
-import { MedicationItemEntity } from './entities/medication-item.entity';
-import { ConsultationEntity } from '../consultation/entities/consultation.entity';
-import { DoctorEntity } from '../doctor/entities/doctor.entity';
-import { UserEntity } from '../auth/entities/user.entity';
-import { ProfileEntity } from '../auth/entities/profile.entity';
 
 @Injectable()
 export class PrescriptionService {
@@ -39,17 +32,14 @@ export class PrescriptionService {
   async createPrescription(
     doctorUserId: string,
     createDto: CreatePrescriptionDto,
-  ): Promise<PrescriptionEntity> {
+  ): Promise<string> {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: createDto.consultation_id },
-        relations: [
-          'doctor',
-          'doctor.user',
-          'doctor.user.profile',
-          'patient',
-          'patient.profile',
-        ],
+        relations: {
+          doctor: { user: { profile: true } },
+          patient: { profile: true },
+        },
       });
 
       if (!consultation) {
@@ -75,11 +65,9 @@ export class PrescriptionService {
         instructions: createDto.instructions?.trim() || null,
       });
 
-      const savedPrescription =
-        await this.prescriptionRepository.save(prescription);
-      savedPrescription.consultation = consultation;
+      await this.prescriptionRepository.save(prescription);
 
-      return this.mapToPrescriptionEntity(savedPrescription);
+      return 'Prescription created successfully';
     } catch (error) {
       handleServiceError(
         error,
@@ -96,18 +84,16 @@ export class PrescriptionService {
     doctorUserId: string,
     prescriptionId: string,
     updateDto: UpdatePrescriptionDto,
-  ): Promise<PrescriptionEntity> {
+  ): Promise<string> {
     try {
       const prescription = await this.prescriptionRepository.findOne({
         where: { prescription_id: prescriptionId },
-        relations: [
-          'consultation',
-          'consultation.doctor',
-          'consultation.doctor.user',
-          'consultation.doctor.user.profile',
-          'consultation.patient',
-          'consultation.patient.profile',
-        ],
+        relations: {
+          consultation: {
+            doctor: { user: { profile: true } },
+            patient: { profile: true },
+          },
+        },
       });
 
       if (!prescription) {
@@ -132,8 +118,8 @@ export class PrescriptionService {
         prescription.instructions = updateDto.instructions?.trim() || null;
       }
 
-      const updated = await this.prescriptionRepository.save(prescription);
-      return this.mapToPrescriptionEntity(updated);
+      await this.prescriptionRepository.save(prescription);
+      return 'Prescription updated successfully';
     } catch (error) {
       handleServiceError(
         error,
@@ -153,14 +139,12 @@ export class PrescriptionService {
     try {
       const prescription = await this.prescriptionRepository.findOne({
         where: { prescription_id: prescriptionId },
-        relations: [
-          'consultation',
-          'consultation.doctor',
-          'consultation.doctor.user',
-          'consultation.doctor.user.profile',
-          'consultation.patient',
-          'consultation.patient.profile',
-        ],
+        relations: {
+          consultation: {
+            doctor: { user: { profile: true } },
+            patient: { profile: true },
+          },
+        },
       });
 
       if (!prescription) {
@@ -177,7 +161,7 @@ export class PrescriptionService {
         );
       }
 
-      return this.mapToPrescriptionEntity(prescription);
+      return prescription as unknown as PrescriptionEntity;
     } catch (error) {
       handleServiceError(
         error,
@@ -197,7 +181,10 @@ export class PrescriptionService {
     try {
       const consultation = await this.consultationRepository.findOne({
         where: { consultation_id: consultationId },
-        relations: ['doctor', 'doctor.user', 'patient'],
+        relations: {
+          doctor: { user: true },
+          patient: true,
+        },
       });
 
       if (!consultation) {
@@ -215,18 +202,16 @@ export class PrescriptionService {
 
       const prescriptions = await this.prescriptionRepository.find({
         where: { consultation_id: consultationId },
-        relations: [
-          'consultation',
-          'consultation.doctor',
-          'consultation.doctor.user',
-          'consultation.doctor.user.profile',
-          'consultation.patient',
-          'consultation.patient.profile',
-        ],
+        relations: {
+          consultation: {
+            doctor: { user: { profile: true } },
+            patient: { profile: true },
+          },
+        },
         order: { issued_at: 'DESC' },
       });
 
-      return prescriptions.map((p) => this.mapToPrescriptionEntity(p));
+      return prescriptions as unknown as PrescriptionEntity[];
     } catch (error) {
       handleServiceError(
         error,
@@ -256,7 +241,7 @@ export class PrescriptionService {
         .orderBy('prescription.issued_at', 'DESC')
         .getMany();
 
-      return prescriptions.map((p) => this.mapToPrescriptionEntity(p));
+      return prescriptions as unknown as PrescriptionEntity[];
     } catch (error) {
       handleServiceError(
         error,
@@ -266,161 +251,5 @@ export class PrescriptionService {
     }
   }
 
-  /**
-   * Helper: Map TypeORM Prescription to GraphQL PrescriptionEntity.
-   */
-  private mapToPrescriptionEntity(
-    prescription: Prescription,
-  ): PrescriptionEntity {
-    let consultationEntity: ConsultationEntity | null = null;
-
-    if (prescription.consultation) {
-      let patientEntity: UserEntity | null = null;
-      let doctorEntity: DoctorEntity | null = null;
-
-      if (prescription.consultation.patient) {
-        let profileEntity: ProfileEntity | null = null;
-        if (prescription.consultation.patient.profile) {
-          profileEntity = {
-            profile_id:
-              prescription.consultation.patient.profile.profile_id,
-            user_id: prescription.consultation.patient.profile.user_id,
-            full_name:
-              prescription.consultation.patient.profile.full_name,
-            date_of_birth:
-              prescription.consultation.patient.profile.date_of_birth,
-            gender: prescription.consultation.patient.profile.gender,
-            phone: prescription.consultation.patient.profile.phone,
-            address: prescription.consultation.patient.profile.address,
-            profile_image_url:
-              prescription.consultation.patient.profile.profile_image_url,
-            created_at:
-              prescription.consultation.patient.profile.created_at,
-            updated_at:
-              prescription.consultation.patient.profile.updated_at,
-          };
-        }
-
-        patientEntity = {
-          user_id: prescription.consultation.patient.user_id,
-          email: prescription.consultation.patient.email,
-          role: prescription.consultation.patient.role,
-          status: prescription.consultation.patient.status,
-          email_verified:
-            prescription.consultation.patient.email_verified,
-          last_login_at:
-            prescription.consultation.patient.last_login_at,
-          created_at: prescription.consultation.patient.created_at,
-          updated_at: prescription.consultation.patient.updated_at,
-          profile: profileEntity,
-        };
-      }
-
-      if (prescription.consultation.doctor) {
-        let doctorUserEntity: UserEntity | null = null;
-        if (prescription.consultation.doctor.user) {
-          let doctorProfileEntity: ProfileEntity | null = null;
-          if (prescription.consultation.doctor.user.profile) {
-            doctorProfileEntity = {
-              profile_id:
-                prescription.consultation.doctor.user.profile.profile_id,
-              user_id:
-                prescription.consultation.doctor.user.profile.user_id,
-              full_name:
-                prescription.consultation.doctor.user.profile.full_name,
-              date_of_birth:
-                prescription.consultation.doctor.user.profile
-                  .date_of_birth,
-              gender:
-                prescription.consultation.doctor.user.profile.gender,
-              phone:
-                prescription.consultation.doctor.user.profile.phone,
-              address:
-                prescription.consultation.doctor.user.profile.address,
-              profile_image_url:
-                prescription.consultation.doctor.user.profile
-                  .profile_image_url,
-              created_at:
-                prescription.consultation.doctor.user.profile.created_at,
-              updated_at:
-                prescription.consultation.doctor.user.profile.updated_at,
-            };
-          }
-
-          doctorUserEntity = {
-            user_id: prescription.consultation.doctor.user.user_id,
-            email: prescription.consultation.doctor.user.email,
-            role: prescription.consultation.doctor.user.role,
-            status: prescription.consultation.doctor.user.status,
-            email_verified:
-              prescription.consultation.doctor.user.email_verified,
-            last_login_at:
-              prescription.consultation.doctor.user.last_login_at,
-            created_at:
-              prescription.consultation.doctor.user.created_at,
-            updated_at:
-              prescription.consultation.doctor.user.updated_at,
-            profile: doctorProfileEntity,
-          };
-        }
-
-        doctorEntity = {
-          doctor_id: prescription.consultation.doctor.doctor_id,
-          user_id: prescription.consultation.doctor.user_id,
-          specialization:
-            prescription.consultation.doctor.specialization,
-          license_number:
-            prescription.consultation.doctor.license_number,
-          qualification:
-            prescription.consultation.doctor.qualification,
-          experience_years:
-            prescription.consultation.doctor.experience_years,
-          consultation_fee:
-            prescription.consultation.doctor.consultation_fee,
-          verification_status:
-            prescription.consultation.doctor
-              .verification_status as VerificationStatus,
-          bio: prescription.consultation.doctor.bio,
-          created_at: prescription.consultation.doctor.created_at,
-          updated_at: prescription.consultation.doctor.updated_at,
-          user: doctorUserEntity,
-        };
-      }
-
-      consultationEntity = {
-        consultation_id: prescription.consultation.consultation_id,
-        patient_id: prescription.consultation.patient_id,
-        doctor_id: prescription.consultation.doctor_id,
-        slot_id: prescription.consultation.slot_id,
-        scheduled_at: prescription.consultation.scheduled_at,
-        consultation_type:
-          prescription.consultation
-            .consultation_type as ConsultationType,
-        reason: prescription.consultation.reason,
-        status: prescription.consultation.status,
-        notes: prescription.consultation.notes,
-        created_at: prescription.consultation.created_at,
-        updated_at: prescription.consultation.updated_at,
-        patient: patientEntity,
-        doctor: doctorEntity,
-      };
-    }
-
-    // Safely cast medication_details JSON array to MedicationItemEntity[]
-    const medicationItems: MedicationItemEntity[] = Array.isArray(
-      prescription.medication_details,
-    )
-      ? (prescription.medication_details as MedicationItemEntity[])
-      : [];
-
-    return {
-      prescription_id: prescription.prescription_id,
-      consultation_id: prescription.consultation_id,
-      diagnosis: prescription.diagnosis,
-      medication_details: medicationItems,
-      instructions: prescription.instructions,
-      issued_at: prescription.issued_at,
-      consultation: consultationEntity,
-    };
-  }
 }
+

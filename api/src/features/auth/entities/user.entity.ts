@@ -2,7 +2,6 @@ import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { UserRole } from '../../../common/enum/user-role.enum';
 import { UserStatus } from '../../../common/enum/user-status.enum';
 import { ProfileEntity } from './profile.entity';
-import './enum.registry';
 
 @ObjectType('AuthUser')
 export class UserEntity {

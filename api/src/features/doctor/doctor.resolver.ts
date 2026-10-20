@@ -15,22 +15,22 @@ import { DoctorEntity } from './entities/doctor.entity';
 export class DoctorResolver {
   constructor(private readonly doctorService: DoctorService) {}
 
-  @Mutation(() => DoctorEntity)
+  @Mutation(() => String)
   async createDoctorProfile(
     @Args('input') createDoctorDto: CreateDoctorDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<DoctorEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.doctorService.createDoctorProfile(user.sub, createDoctorDto);
   }
 
-  @Mutation(() => DoctorEntity)
+  @Mutation(() => String)
   async updateDoctorProfile(
     @Args('input') updateDoctorDto: UpdateDoctorDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<DoctorEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }

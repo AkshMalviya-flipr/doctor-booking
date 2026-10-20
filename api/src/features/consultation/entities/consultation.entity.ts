@@ -1,11 +1,7 @@
-import { ObjectType, Field, ID, registerEnumType } from '@nestjs/graphql';
+import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { ConsultationType } from '../../../common/enum/consultation-type.enum';
 import { UserEntity } from '../../auth/entities/user.entity';
 import { DoctorEntity } from '../../doctor/entities/doctor.entity';
-
-registerEnumType(ConsultationType, {
-  name: 'ConsultationType',
-});
 
 @ObjectType('Consultation')
 export class ConsultationEntity {

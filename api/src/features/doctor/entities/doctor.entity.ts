@@ -1,10 +1,6 @@
-import { ObjectType, Field, ID, Int, registerEnumType } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 import { VerificationStatus } from '../../../common/enum/verification-status.enum';
 import { UserEntity } from '../../auth/entities/user.entity';
-
-registerEnumType(VerificationStatus, {
-  name: 'VerificationStatus',
-});
 
 @ObjectType('Doctor')
 export class DoctorEntity {

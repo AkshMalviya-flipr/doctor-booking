@@ -14,33 +14,33 @@ import { PaymentEntity } from './entities/payment.entity';
 export class PaymentResolver {
   constructor(private readonly paymentService: PaymentService) {}
 
-  @Mutation(() => PaymentEntity)
+  @Mutation(() => String)
   async createPayment(
     @Args('input') createDto: CreatePaymentDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<PaymentEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.paymentService.createPayment(user.sub, createDto);
   }
 
-  @Mutation(() => PaymentEntity)
+  @Mutation(() => String)
   async processPayment(
     @Args('input') processDto: ProcessPaymentDto,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<PaymentEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }
     return this.paymentService.processPayment(user.sub, processDto);
   }
 
-  @Mutation(() => PaymentEntity)
+  @Mutation(() => String)
   async refundPayment(
     @Args('paymentId', { type: () => ID }) paymentId: string,
     @CurrentUser() user: JwtPayload | undefined,
-  ): Promise<PaymentEntity> {
+  ): Promise<string> {
     if (!user?.sub) {
       throw new UnauthorizedException('Authentication credentials were not provided');
     }

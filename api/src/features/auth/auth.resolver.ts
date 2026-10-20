@@ -9,8 +9,6 @@ import {
 } from '../../common/decorator/current-user.decorator';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
-import { AuthResponse } from './entities/auth-response.entity';
-import { LogoutResponse } from './entities/logout-response.entity';
 import { UserEntity } from './entities/user.entity';
 
 @Resolver(() => UserEntity)
@@ -18,28 +16,28 @@ export class AuthResolver {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Mutation(() => AuthResponse)
+  @Mutation(() => String)
   async signup(
     @Args('signupInput') signupDto: SignupDto,
     @Context() context: { req: Request; res: Response },
-  ): Promise<AuthResponse> {
+  ): Promise<string> {
     return this.authService.signup(signupDto, context?.res);
   }
 
   @Public()
-  @Mutation(() => AuthResponse)
+  @Mutation(() => String)
   async login(
     @Args('loginInput') loginDto: LoginDto,
     @Context() context: { req: Request; res: Response },
-  ): Promise<AuthResponse> {
+  ): Promise<string> {
     return this.authService.login(loginDto, context?.res);
   }
 
   @Public()
-  @Mutation(() => LogoutResponse)
+  @Mutation(() => String)
   async logout(
     @Context() context: { req: Request; res: Response },
-  ): Promise<LogoutResponse> {
+  ): Promise<string> {
     return this.authService.logout(context?.res);
   }
 
